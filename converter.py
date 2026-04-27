@@ -1,47 +1,67 @@
 import yt_dlp
 import os
+import shutil
 
-# Carpeta donde se guardan los MP3s
-DOWNLOADS_FOLDER = "downloads"
+# Temporary folder for audio files
+TEMP_FOLDER = "temp"
 
-def crear_carpeta_downloads():
-    """Crea la carpeta downloads si no existe"""
-    if not os.path.exists(DOWNLOADS_FOLDER):
-        os.makedirs(DOWNLOADS_FOLDER)
+def clean_temp_folder():
+    """Deletes and recreates the temp folder to remove old files"""
+    if os.path.exists(TEMP_FOLDER):
+        shutil.rmtree(TEMP_FOLDER)
+    os.makedirs(TEMP_FOLDER)
 
-def obtener_info(url: str):
-    """Obtiene información del video sin descargarlo"""
-    opciones = {
+def extract_url(url: str):
+    """Cleans YouTube URL and extracts only the video ID part"""
+    if "watch?v=" in url:
+        video_id = url.split("watch?v=")[1].split("&")[0]
+        return f"https://www.youtube.com/watch?v={video_id}"
+    return url
+
+def get_info(url: str):
+    """Gets video information without downloading"""
+    clean_url = extract_url(url)
+    options = {
         'quiet': True,
         'no_warnings': True,
     }
-    with yt_dlp.YoutubeDL(opciones) as ydl:
-        info = ydl.extract_info(url, download=False)
+    with yt_dlp.YoutubeDL(options) as ydl:
+        info = ydl.extract_info(clean_url, download=False)
         return {
-            'titulo': info['title'],
-            'duracion': info['duration'],
+            'title': info['title'],
+            'duration': info['duration'],
             'thumbnail': info['thumbnail'],
             'uploader': info['uploader'],
         }
 
-def convertir_a_mp3(url: str):
-    """Descarga y convierte el audio a MP3"""
-    crear_carpeta_downloads()
-    
-    opciones = {
-        'format': 'bestaudio/best',
-        'outtmpl': f'{DOWNLOADS_FOLDER}/%(title)s.%(ext)s',
-        'postprocessors': [{
+def convert_audio(url: str, format: str = 'mp3', quality: str = '192'):
+    """Downloads and converts audio to the selected format and quality"""
+    clean_url = extract_url(url)
+    clean_temp_folder()
+
+    # FLAC does not use bitrate, only MP3/AAC/OGG do
+    if format == 'flac':
+        postprocessors = [{
             'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+            'preferredcodec': 'flac',
+        }]
+    else:
+        postprocessors = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': format,
+            'preferredquality': quality,
+        }]
+
+    options = {
+        'format': 'bestaudio/best',
+        'outtmpl': f'{TEMP_FOLDER}/%(title)s.%(ext)s',
+        'postprocessors': postprocessors,
         'quiet': True,
         'no_warnings': True,
     }
-    
-    with yt_dlp.YoutubeDL(opciones) as ydl:
-        info = ydl.extract_info(url, download=True)
-        titulo = info['title']
-        archivo = f"{DOWNLOADS_FOLDER}/{titulo}.mp3"
-        return archivo, titulo
+
+    with yt_dlp.YoutubeDL(options) as ydl:
+        info = ydl.extract_info(clean_url, download=True)
+        title = info['title']
+        file = f"{TEMP_FOLDER}/{title}.{format}"
+        return file, title
