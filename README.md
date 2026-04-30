@@ -13,6 +13,9 @@ Built with Python and Streamlit, runs locally on your machine.
 - Choose your format and quality before downloading
 - Preview video info (title, channel, duration, thumbnail) before converting
 - Temp folder auto-cleans on startup and when switching videos
+- Edit song name and artist metadata before converting
+- Choose to embed or skip cover art (thumbnail) in the audio file
+- All source metadata stripped — only user-confirmed tags are saved
 
 ## Supported Formats
 
