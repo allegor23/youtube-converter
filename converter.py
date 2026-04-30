@@ -18,6 +18,13 @@ def extract_url(url: str):
         return f"https://www.youtube.com/watch?v={video_id}"
     return url
 
+def clean_filename(filename: str):
+    """Removes characters that are invalid in Windows filenames"""
+    invalid_chars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|']
+    for char in invalid_chars:
+        filename = filename.replace(char, '')
+    return filename.strip()
+
 def get_info(url: str):
     """Gets video information without downloading"""
     clean_url = extract_url(url)
@@ -34,12 +41,18 @@ def get_info(url: str):
             'uploader': info['uploader'],
         }
 
-def convert_audio(url: str, format: str = 'mp3', quality: str = '192'):
-    """Downloads and converts audio to the selected format and quality"""
+def convert_audio(url: str, format: str = 'mp3', quality: str = '192',
+                  song_title: str = None, artist: str = None,
+                  include_thumbnail: bool = False):
+    """
+    Downloads and converts audio with user-defined metadata.
+    All metadata is stripped except what the user explicitly provides.
+    Thumbnail is only embedded if include_thumbnail is True.
+    """
     clean_url = extract_url(url)
     clean_temp_folder()
 
-    # FLAC does not use bitrate, only MP3/AAC/OGG do
+    # Base postprocessors — extract audio
     if format == 'flac':
         postprocessors = [{
             'key': 'FFmpegExtractAudio',
@@ -52,16 +65,43 @@ def convert_audio(url: str, format: str = 'mp3', quality: str = '192'):
             'preferredquality': quality,
         }]
 
+    # Add metadata postprocessor with user values
+    postprocessors.append({
+        'key': 'FFmpegMetadata',
+        'add_metadata': True,
+    })
+
+    # Embed thumbnail only if user chose to
+    if include_thumbnail:
+        postprocessors.append({
+            'key': 'EmbedThumbnail',
+        })
+
+    # Get clean title before downloading
+    with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+        raw_info = ydl.extract_info(clean_url, download=False)
+        clean_title = clean_filename(raw_info['title'])
+
     options = {
         'format': 'bestaudio/best',
-        'outtmpl': f'{TEMP_FOLDER}/%(title)s.%(ext)s',
+        'outtmpl': f'{TEMP_FOLDER}/{clean_title}.%(ext)s',
         'postprocessors': postprocessors,
         'quiet': True,
         'no_warnings': True,
+        # Strip all metadata from source
+        'postprocessor_args': {
+            'ffmpeg': [
+                '-map_metadata', '-1',  # strip all metadata
+                '-metadata', f'title={song_title or ""}',
+                '-metadata', f'artist={artist or ""}',
+            ]
+        },
+        # Do not write or embed thumbnail unless user chose to
+        'writethumbnail': include_thumbnail,
+        'embedthumbnail': include_thumbnail,
     }
 
     with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(clean_url, download=True)
-        title = info['title']
-        file = f"{TEMP_FOLDER}/{title}.{format}"
-        return file, title
+        ydl.extract_info(clean_url, download=True)
+        file = f"{TEMP_FOLDER}/{clean_title}.{format}"
+        return file, clean_title

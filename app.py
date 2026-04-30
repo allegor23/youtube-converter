@@ -72,6 +72,16 @@ st.markdown("""
     margin-bottom: 4px;
 }
 
+/* Section title */
+.section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    color: #1a1a18;
+    margin: 24px 0 16px;
+    border-bottom: 1px solid #c8b89a;
+    padding-bottom: 8px;
+}
+
 /* Streamlit selectbox and input overrides */
 .stSelectbox > div > div {
     background-color: transparent !important;
@@ -99,6 +109,15 @@ st.markdown("""
 .stTextInput > div > div > input:focus {
     box-shadow: none !important;
     border-bottom: 1.5px solid #8a5a2a !important;
+}
+
+/* Checkbox */
+.stCheckbox > label {
+    font-family: 'Jost', sans-serif !important;
+    font-size: 11px !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    color: #8a7a6a !important;
 }
 
 /* Video info card */
@@ -250,7 +269,7 @@ if url:
         with st.spinner(""):
             info = get_info(url)
 
-        # Video card
+        # Video preview card
         col1, col2 = st.columns([1, 2])
         with col1:
             st.image(info['thumbnail'], use_container_width=True)
@@ -265,13 +284,52 @@ if url:
             </div>
             """, unsafe_allow_html=True)
 
+        # Metadata section
+        st.markdown('<div class="section-title">Confirm Metadata</div>', unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown('<div class="field-label">Song Name</div>', unsafe_allow_html=True)
+            song_title = st.text_input(
+                "",
+                value=info['title'],
+                key="song_title",
+                label_visibility="collapsed"
+            )
+        with col2:
+            st.markdown('<div class="field-label">Artist</div>', unsafe_allow_html=True)
+            artist = st.text_input(
+                "",
+                value=info['uploader'],
+                key="artist",
+                label_visibility="collapsed"
+            )
+
+        # Thumbnail option
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Cover Art</div>', unsafe_allow_html=True)
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            st.image(info['thumbnail'], use_container_width=True)
+        with col2:
+            st.markdown('<div class="field-label" style="margin-top: 8px;">Thumbnail</div>', unsafe_allow_html=True)
+            include_thumbnail = st.checkbox("Embed thumbnail in audio file", value=True)
+            st.markdown('<div class="video-meta" style="margin-top: 8px;">Uncheck to download without cover art</div>', unsafe_allow_html=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
         # Convert button
         if st.button("⬇ Convert & Download"):
             with st.spinner("Converting..."):
-                file, title = convert_audio(url, format_code, quality)
+                file, title = convert_audio(
+                    url,
+                    format_code,
+                    quality,
+                    song_title=song_title,
+                    artist=artist,
+                    include_thumbnail=include_thumbnail
+                )
                 with open(file, "rb") as f:
                     st.session_state.audio_data = f.read()
                 st.session_state.audio_title = title
